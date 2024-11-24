@@ -1,0 +1,169 @@
+---
+title: "Survival Analysis"
+author: "Liam Murphy"
+date: "2024-11-23"
+output: html_document
+---
+
+```{r}
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+library(broom)
+library(gtsummary)
+data(cancer, package="survival")
+myeloid
+head(myeloid)
+myeloid <- na.omit(myeloid)
+```
+
+```{r}
+# Create kaplan meier curve variable 
+km <- with(myeloid, Surv(futime, death ))
+
+# Inspect variable 
+head(km, 80)
+
+
+```
+
+```{r}
+
+# Produce kaplan meier survival estimates of the probability of survival over time
+km_fit <- survfit(Surv(futime, death) ~ 1, data = myeloid )
+
+summary(km_fit, death = c(1,30,60,90*(1:10))) 
+summary(survfit(Surv(futime,death) ~ 1, data = myeloid), times = 365.25)
+
+myeloid %>%
+  filter(death==1) %>%
+  summarize(median_surv =median(futime))
+
+
+# Create for loop to conduct between group significance test using a log rank test. The log-rank test weights obs over the entire follow-up time. Variables related to time, death and id were excluded. 
+
+for (i in colnames(myeloid)) {
+  if (i != "futime" && i != "death" && i != "id" && i != "txtime" && i!="crtime" && i!="rltime") { # Exclude the survival variables
+    formula <- as.formula(paste("Surv(futime, death) ~", i))
+    result <- survdiff(formula, data = myeloid)
+    print(result) # Display the results
+  }
+}
+
+
+autoplot(km_fit)
+
+
+
+```
+
+
+```{r}
+# Looking at survival times stratified by treatment
+km_trt_fit <- survfit(Surv(futime, death) ~ trt, data=myeloid)
+
+autoplot(km_trt_fit)
+
+```
+
+```{r}
+# Fitting a cox proportional hazards model (semi-parametric multiplicative model) making use of covairates in the dataset 
+cox <- coxph(Surv(futime, death) ~ trt + sex + flt3 + txtime + crtime +rltime ,  data = myeloid)
+summary(cox)
+
+cox_fit <- survfit(cox)
+
+#plot(cox_fit, main = "cph model", xlab="Days")
+autoplot(cox_fit)
+```
+
+The only significant covariate is rltime (time to relapse of disease)  with a p-value > .01. 
+
+```{r}
+
+# The Aalen model(non-parametric additive model) assumes that the cumulative hazard H(t) for a subject can be expressed as a(t) + X * B(t) where a(t) is a time independent intercept term, X is a vector of covariates(could be time dependent) and B(t) is a time-dependent matrix of coefficients 
+
+aa_fit <-aareg(Surv(futime, death) ~ trt + sex + flt3 + txtime + crtime +rltime ,  data = myeloid)
+
+aa_fit
+
+autoplot(aa_fit)
+```
+
+```{r}
+# Ranger builds a model for each obs in the dataset 
+
+
+# Model using the same variables as the cox model 
+r_fit <- ranger(Surv(futime, death) ~ trt + sex + flt3 + txtime + crtime +rltime ,  data = myeloid, mtry = 4,
+                     importance = "permutation",
+                     splitrule = "extratrees",
+                     verbose = TRUE)
+
+death_times <- r_fit$unique.death.times
+surv_prob <- data.frame(r_fit$survival)
+avg_prob <- sapply(surv_prob, mean)
+
+
+# Plot the survival models for each patient
+plot(r_fit$unique.death.times,r_fit$survival[1,], 
+     type = "l", 
+     ylim = c(0,1),
+     col = "red",
+     xlab = "Days",
+     ylab = "survival",
+     main = "Patient Survival Curves")
+
+cols <- colors()
+
+for (n in sample(c(2:dim(myeloid)[1]), 20)) {
+  lines(r_fit$unique.death.times, r_fit$survival[n,], type = "l", col = cols[n])
+}
+
+lines(death_times, avg_prob, lwd = 2)
+legend(500, 0.2, legend = c('Average = black'))
+
+```
+
+
+```{r}
+
+# Ranking importance of each variable from the RF model 
+vi <- data.frame(sort(round(r_fit$variable.importance, 4), decreasing = TRUE))
+names(vi) <- "importance"
+head(vi)
+
+
+```
+
+```{r}
+# The Harrell's c-index is similar to the concordance statistic 
+# This is a generalization of the ROC curve which reduces the Wilcoxon-Mann-Whitney statistic for binary variable, which in turn computes the area  under the ROC curve 
+
+cat("Prediction Error = 1 - Harrell's c-index = ", r_fit$prediction.error)
+
+```
+
+
+```{r}
+# Set up for ggplot
+kmi <- rep("KM",length(km_fit$time))
+km_df <- data.frame(km_fit$time,km_fit$surv,kmi)
+names(km_df) <- c("Time","Surv","Model")
+
+coxi <- rep("Cox",length(cox_fit$time))
+cox_df <- data.frame(cox_fit$time,cox_fit$surv,coxi)
+names(cox_df) <- c("Time","Surv","Model")
+
+rfi <- rep("RF",length(r_fit$unique.death.times))
+rf_df <- data.frame(r_fit$unique.death.times,avg_prob,rfi)
+names(rf_df) <- c("Time","Surv","Model")
+
+plot_df <- rbind(km_df,cox_df,rf_df)
+
+p <- ggplot(plot_df, aes(x = Time, y = Surv, color = Model))
+p + geom_line()
+
+```
