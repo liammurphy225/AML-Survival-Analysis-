@@ -81,9 +81,32 @@ The dataset `myeloid.csv` is an example dataset provided in the `survival` R pac
   - Assess model fit using Harrell's c-index.
 
 ## Results
-- Kaplan-Meier survival estimates provide insights into overall and group-specific survival probabilities.
+- Kaplan-Meier survival estimates provide insights into overall and group-specific           survival probabilities.
+   - At 1 year the estimated survival probability is 79.4%  with a 95% CI: (0.729 – 0.865).
+   - Number at risk: 108, with 28 events (deaths).
+   - Treatment A: 60 patients, 43 deaths, expected = 34.2.
+   -Treatment B: 76 patients, 46 deaths, expected = 54.8.
+   - Chi-squared = 3.7, p = 0.05, suggesting borderline statistical significance.
+
 - Cox proportional hazards model identifies significant covariates (e.g., `rltime`).
-- Random survival forests highlight variable importance and provide patient-specific survival predictions.
+  Key Time Points:
+   -At 191 days, survival drops to 97%.
+   -At 518 days, survival is 66%.
+   -At 1,000 days, survival is around 40%.
+   -At 2,283 days, survival drops to ~25%.
+
+-The Aalen model is a non-parametric additive model that assumes that the cumulative hazard H(t) for a subject can be expressed as a(t) + X * B(t) where a(t) is a time independent intercept term, X is a vector of covariates(could be time dependent) and B(t) is a time-dependent matrix of coefficients.
+
+   Significant Predictors:
+   -Intercept (p = 9.94e-07): Suggests an overall baseline hazard effect.
+   -rltime (p = 1.11e-06): Highly significant, indicating a strong relationship with          survival.
+   Non-Significant Predictors:
+   -Treatment (trtB), sex (sexm), FLT3 mutation (flt3B, flt3C), txtime, and crtime have p-     values above 0.05, suggesting they are not significantly associated with survival in       this model.
+   Overall Model Fit:
+   -The model is statistically significant (Chisq = 40.71, p = 9.21e-07), meaning at least    one predictor significantly contributes to explaining survival.
+
+- Random survival forests highlight variable importance and provide patient-specific
+  survival predictions.
 - Combined plots facilitate model comparison.
 
 ## Contributing
