@@ -109,19 +109,6 @@ The dataset `myeloid.csv` is an example dataset provided in the `survival` R pac
   survival predictions.
 - Combined plots facilitate model comparison.
 
-## Contributing
-1. Fork the repository.
-2. Create a new branch:
-   ```bash
-   git checkout -b feature-name
-   ```
-3. Commit your changes and push to the branch:
-   ```bash
-   git commit -m "Add new feature"
-   git push origin feature-name
-   ```
-4. Open a pull request.
-
 ## License
 This project is licensed under the [MIT License](LICENSE).
 
